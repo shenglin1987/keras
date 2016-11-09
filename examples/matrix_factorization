@@ -1,0 +1,63 @@
+from __future__ import print_function
+from keras.models import Sequential
+from keras.layers.embeddings import Embedding
+from keras.layers.core import Dense, Activation, Dropout, TimeDistributedDense,RepeatVector,Merge,Reshape
+from keras.layers.recurrent import GRU,LSTM
+from keras.datasets.data_utils import get_file
+import numpy as np
+import re
+#import operator
+#import helper
+from collections import Counter
+import sys
+from keras.models import model_from_json
+import pandas as pd
+from keras.optimizers import Adamax
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras import backend as K
+from keras.engine.topology import Layer 
+
+smallNetflix = pd.read_csv('smallnetflix_mm.csv')
+smallNetflixE = pd.read_csv('smallnetflix_mme.csv')
+max_uid = smallNetflix['uid'].drop_duplicates().max()
+max_mid = smallNetflix['mid'].drop_duplicates().max()
+
+print("num_ratings", len(smallNetflix))
+uids = smallNetflix['uid'].values
+print(len(uids))
+print('uids_shape', uids.shape)
+mids = smallNetflix['mid'].values
+print( len(mids))
+rates = smallNetflix['rate'].values
+
+uids_e = smallNetflixE['uid'].values
+mids_e = smallNetflixE['mid'].values
+rates_e = smallNetflixE['rate'].values
+
+print("num_users", (max_uid))
+
+print("num_movies", (max_mid))
+
+#this is important, keras starts from zero
+num_user = max_uid+1
+num_POI = max_mid+1
+vec_dim = 50
+
+userModel = Sequential()
+userModel.add(Embedding(num_user, output_dim=vec_dim, input_length=1))
+userModel.add(Reshape((vec_dim,)))
+
+poiModel = Sequential()
+poiModel.add(Embedding(num_POI, output_dim=vec_dim, input_length=1))
+poiModel.add(Reshape((vec_dim,)))
+
+cfModel = Sequential()
+merge = Merge([userModel, poiModel], mode='dot', dot_axes=1)
+cfModel.add(merge)
+
+#this is important, Merget outputs a tuple
+#No reshape, get exception
+cfModel.add(Reshape((1,)))
+
+cfModel.compile(loss='mse', optimizer='sgd')
+cfModel.fit([uids, mids], rates, nb_epoch=10, verbose=2, validation_data=([uids_e, mids_e], rates_e))
